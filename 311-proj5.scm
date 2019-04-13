@@ -11,17 +11,37 @@
 
 
 ;************************************************************************************************************************************
-; private functions
+; private functions - unused 
 
 
-; Return the list of persons no more than maxhops hops away. Do a breadth first search to count hops from a source node. 
-(define (hops-away graph start maxhops)
-  (begin
-    (define friends '())
-    (let-values ( [ (first second) (bfs graph start) ] )
-      (hash-for-each first (lambda (k v) (when (and (not (equal? v 0)) (<= v maxhops)) (set! friends (cons k friends))))))
-    friends)
-  )
+; Get the weights from a person to every other person, return as a list of lists ( (person1 weight1) (person2 weight2) ...)
+;(define (getWeightsFrom person)
+;  (begin
+;    (define weights '())
+;    ; Run the Dijkstra algorithm to find the weight of the path from the source person to each other person.
+;    (let-values ( [ (first second) (dijkstra relations person) ] )
+;      (hash-for-each first (lambda (k v) (when (not (equal? v 0)) (set! weights (cons (list k v) weights))))))
+;    weights)
+;  )
+
+
+; return a list of the products bought by a person 
+;(define (%boughtProducts person)
+;  (dedupe (cdar 
+;           (%which (products)
+;                   (%let (product)
+;                         (%bag-of product (%bought person product) products))))))
+
+
+; products in a category 
+;(define (%productsInCategory category)
+;  (%which (products)
+;          (%let (product)
+;                (%bag-of product (%products product category) products))))
+
+
+;************************************************************************************************************************************
+; private functions 
 
 
 ; eliminate duplicates from a list 
@@ -31,14 +51,13 @@
                                     (cdr e))))))
 
 
-; Get the weights from a person to every other person, return as a list of lists ( (person1 weight1) (person2 weight2) ...)
-(define (getWeightsFrom person)
+; Return the list of persons no more than maxhops hops away. Do a breadth first search to count hops from a source node. 
+(define (hops-away graph start maxhops)
   (begin
-    (define weights '())
-    ; Run the Dijkstra algorithm to find the weight of the path from the source person to each other person.
-    (let-values ( [ (first second) (dijkstra relations person) ] )
-      (hash-for-each first (lambda (k v) (when (not (equal? v 0)) (set! weights (cons (list k v) weights))))))
-    weights)
+    (define friends '())
+    (let-values ( [ (first second) (bfs graph start) ] )
+      (hash-for-each first (lambda (k v) (when (and (not (equal? v 0)) (<= v maxhops)) (set! friends (cons k friends))))))
+    friends)
   )
 
 
@@ -54,41 +73,38 @@
     (define weights '())
     (let-values ( [ (first second) (dijkstra relations person) ] )
       (hash-for-each first (lambda (k v) (when (and (not (equal? v 0)) (member k set)) (set! weights (cons (list k v) weights))))))    
-    (sort weights weightSort)  ; return the list of weighted paths in ascending sorted order 
+    (sort weights weightSort)   ; return the list of weighted paths in ascending sorted order 
   ))
-
-
-; return a list of the products bought by a person 
-(define (%boughtProducts person)
-  (dedupe (cdar 
-           (%which (products)
-                   (%let (product)
-                         (%bag-of product (%bought person product) products))))))
-
-
-; the products bought by the friend but not the person 
-(define (%notBoughtProducts person friend)
-  (%which (products)
-          (%let (product)
-                (%bag-of product (%and (%bought friend product)
-                                       (%not (%bought person product)))
-                         products))))
 
 
 ; the categories purchased by a person
 (define (%boughtCategories person)
-  (dedupe (cdar 
-           (%which (categories)
-                   (%let (p category)
-                         (%bag-of category (%and (%products p category) (%bought person p)) categories))))))
+  (let ((result (%which (categories)
+                        (%let (p category)
+                              (%bag-of category (%and (%products p category) (%bought person p)) categories)))))
+    (if (not (eq? result #f)) (dedupe (cdar result)) '())   ; return an empty list if no categories bought 
+    ))
 
 
-; products in a category 
-(define (%productsInCategory category)
-  (%which (products)
-          (%let (product)
-                (%bag-of product (%products product category) products))))
+; the products bought by a friend but not by the person, and in a category bought by both 
+(define (%notBoughtProductsInSimilarCategories person friend)
+  (let ((result (%which (products)
+                      (%let (product category)
+                            (%bag-of product (%and (%bought friend product)                         ; friend bought a product
+                                                   (%not (%bought person product))                  ; that the person didn't 
+                                                   (%products product category)                     ; and the product is in a category
+                                                   (%member category (%boughtCategories person))    ; bought by the person 
+                                                   )
+                                     products)))))
+    (if (not (eq? result #f)) (dedupe (cdar result)) #f)    ; if not empty, unpack the bag-of into a regular list, else return #f
+    ))
 
+
+(define (consultFriends person friends)
+  (cond ((null? friends) #f)
+        ((%notBoughtProductsInSimilarCategories person (caar friends))
+         (list (caar friends) (car (%notBoughtProductsInSimilarCategories person (caar friends)))))
+        (#t (consultFriends person (cdr friends)))))
 
 
 ;************************************************************************************************************************************
@@ -108,33 +124,20 @@
 (define (addProduct! product category)
   (%assert! %products () [(product category)]))
 
- 
+
+; recommend a product for a person via the strongest friend no more than n hops away 
 (define (recommendProduct person hops)
   (begin
     ; get the friends of a person within a certain number of social hops, sorted by strength of connection 
     (define weightedFriends (getWeightsFromHopSet person hops))
-    ; get the products this person bought 
-    (define personBoughtProducts (%boughtProducts person))
-    ; get the categories this person bought 
-    (define personBoughtCategories (%boughtCategories person))
     ; for each weighted friend in order, see if the friend bought a product from one of the categories of the person,
     ; but not one the person bought
-    
-    
-    
-    ; debug 
-    (display weightedFriends)
-    (display "\n")
-    (display personBoughtProducts)
-    (display "\n")
-    (display personBoughtCategories)
-    (display "\n")
-
-    (display (%notBoughtProducts person 'Andy))
-    (display "\n")
-    )
-  )
-
+    (display person) (display ": ")
+    (let ((result (consultFriends person weightedFriends)))
+      (if (not (eq? result #f))
+          (begin (display "DEBUG: ") (display (car result)) (display " recommends ") (display (cadr result)) (display "\n")
+                                       (cadr result)) #f)
+      )))
 
 
 ;************************************************************************************************************************************
@@ -178,24 +181,33 @@
 (addSocial! 'Wendy 'Betty 5)
 (addSocial! 'Betty 'Kathy 5)
 (addSocial! 'Betty 'Lou 5)
+(addSocial! 'Loner 'Loner 1)
+(addSocial! 'Cheapo 'Susan 3)
+(addSocial! 'Shy 'Cheapo 5)
 
 (addPurchase! 'Andy 'MacBook)
+(addPurchase! 'Andy 'Android)
+(addPurchase! 'Andy 'Sneakers)
 (addPurchase! 'Kathy 'Kindle)
-(addPurchase! 'Sal 'Android)
-(addPurchase! 'Dom 'iPhone)
+(addPurchase! 'Kathy 'MacBook)
+(addPurchase! 'Kathy 'Android)
+(addPurchase! 'Kathy 'iPhone)
 (addPurchase! 'Kathy 'Yarn)
-(addPurchase! 'Dom 'Paint)
+(addPurchase! 'Kathy 'Glue) 
+(addPurchase! 'Sal 'Android)
 (addPurchase! 'Sal 'Sneakers)
+(addPurchase! 'Dom 'iPhone)
+(addPurchase! 'Dom 'Paint)
 (addPurchase! 'Tony 'Football)
 (addPurchase! 'Tony 'iPhone)
 (addPurchase! 'Hannah 'iPhone)
 (addPurchase! 'Hannah 'Paint)
 (addPurchase! 'Susan 'Yarn)
+(addPurchase! 'Susan 'Paint) 
 (addPurchase! 'Wendy 'YogaMat)
 (addPurchase! 'Betty 'YogaMat)
 (addPurchase! 'Betty 'iPhone)
-(addPurchase! 'Kathy 'MacBook)
-(addPurchase! 'Andy 'Android)
+(addPurchase! 'Shy 'iPhone)
 
 (addProduct! 'MacBook 'Electronics)
 (addProduct! 'Kindle 'Electronics)
@@ -203,14 +215,21 @@
 (addProduct! 'iPhone 'Electronics)
 (addProduct! 'Yarn 'Crafts)
 (addProduct! 'Paint 'Crafts)
+(addProduct! 'Glue 'Crafts)
 (addProduct! 'Football 'Sporting)
 (addProduct! 'YogaMat 'Sporting)
 (addProduct! 'Sneakers 'Sporting)
 (addProduct! 'Blackberry 'Electronics)
 
 
-(recommendProduct 'Kathy 2)
-
+(recommendProduct 'Kathy 2)    
+(recommendProduct 'Andy 1)
+(recommendProduct 'Loner 2)    ; Loner knows noone in the social graph but himself, bought nothing 
+(recommendProduct 'Cheapo 1)   ; Cheapo has friends but bought nothing - so no categories to recommend
+(recommendProduct 'Shy 1)      ; Shy knows Cheapo, but Cheapo didn't buy anything, so has nothing to recommend 
+(recommendProduct 'Susan 1)    ; Susan knows Cheapo and Wendy, but Wendy didn't buy anything in the same category as Susan
+(recommendProduct 'Susan 2)    ; still nothing to recoomend...
+(recommendProduct 'Susan 3)    ; Susan knows Wendy, and Wendy knows Betty, and Betty knows Kathy who bought glue 
 
 
 
