@@ -11,36 +11,6 @@
 
 
 ;************************************************************************************************************************************
-; private functions - unused 
-
-
-; Get the weights from a person to every other person, return as a list of lists ( (person1 weight1) (person2 weight2) ...)
-;(define (getWeightsFrom person)
-;  (begin
-;    (define weights '())
-;    ; Run the Dijkstra algorithm to find the weight of the path from the source person to each other person.
-;    (let-values ( [ (first second) (dijkstra relations person) ] )
-;      (hash-for-each first (lambda (k v) (when (not (equal? v 0)) (set! weights (cons (list k v) weights))))))
-;    weights)
-;  )
-
-
-; return a list of the products bought by a person 
-;(define (%boughtProducts person)
-;  (dedupe (cdar 
-;           (%which (products)
-;                   (%let (product)
-;                         (%bag-of product (%bought person product) products))))))
-
-
-; products in a category 
-;(define (%productsInCategory category)
-;  (%which (products)
-;          (%let (product)
-;                (%bag-of product (%products product category) products))))
-
-
-;************************************************************************************************************************************
 ; private functions 
 
 
@@ -138,26 +108,6 @@
           (begin (display "DEBUG: ") (display (car result)) (display " recommends ") (display (cadr result)) (display "\n")
                                        (cadr result)) #f)
       )))
-
-
-;************************************************************************************************************************************
-; debug 
-
-
-;(begin (display "--> ") (%which (category) (%bought-categories 'Andy)))
-  
-;(begin (display "--> ") (%which () (%bought-category 'Andy 'Electronics)))
-;(begin (display "--> ") (%which () (%bought-category 'Andy 'Crafts)))
-
-;(%products-in-category 'Electronics)
-
-;(hops-away relations 'Andy 1)
-;(hops-away relations 'Kathy 2)
-
-; (getWeightsFrom 'Andy)
-
-; (getWeightsFromHopSet 'Andy 2)
-
 
 
 ;************************************************************************************************************************************
