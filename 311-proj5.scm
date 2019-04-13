@@ -4,57 +4,17 @@
 (require graph)
 (require racklog) 
 
-; define a weighted graph
+; define the empty social relation graph and the product relations for purchases and product categories 
 (define relations (weighted-graph/undirected '() ))
-; add some weighted edges 
-(add-edge! relations 'Andy 'Kathy 1)
-(add-edge! relations 'Kathy 'Sal 1)
-(add-edge! relations 'Andy 'Sal 1)
-(add-edge! relations 'Andy 'Dom 1)
-(add-edge! relations 'Andy 'Sal 1)
-(add-edge! relations 'Andy 'Tony 5)
-(add-edge! relations 'Sal 'Hannah 3)
-(add-edge! relations 'Dom 'Hannah 5)
-(add-edge! relations 'Sal 'Tony 10)
-(add-edge! relations 'Dom 'Tony 10)
-(add-edge! relations 'Tony 'Hannah 5)
-(add-edge! relations 'Hannah 'Susan 5)
-(add-edge! relations 'Susan 'Wendy 5)
-(add-edge! relations 'Wendy 'Betty 5)
-(add-edge! relations 'Betty 'Kathy 5)
+(define %bought (%rel ()))
+(define %products (%rel ()))
 
-(define %bought
-  (%rel ()
-        [('Andy 'MacBook)]
-        [('Kathy 'Kindle)]
-        [('Sal 'Android)]
-        [('Dom 'iPhone)]
-        [('Kathy 'Yarn)]
-        [('Dom 'Paint)]
-        [('Sal 'Sneakers)]
-        [('Tony 'Football)]
-        [('Tony 'iPhone)]
-        [('Hannah 'iPhone)]
-        [('Hannah 'Paint)]
-        [('Susan 'Yarn)]
-        [('Wendy 'YogaMat)]
-        [('Betty 'YogaMat)]
-        ))
 
-(define %products
-  (%rel ()
-        [('MacBook 'Electronics)]
-        [('Kindle 'Electronics)]
-        [('Android 'Electronics)]
-        [('iPhone 'Electronics)]
-        [('Yarn 'Crafts)]
-        [('Paint 'Crafts)]
-        [('Football 'Sporting)]
-        [('YogaMat 'Sporting)]
-        [('Sneakers 'Sporting)]        
-        ))  
+;************************************************************************************************************************************
+; private functions
 
-; Return the list of persons no more than n hops away. Do a breadth first search to count hops from a source node. 
+
+; Return the list of persons no more than maxhops hops away. Do a breadth first search to count hops from a source node. 
 (define (hops-away graph start maxhops)
   (begin
     (define friends '())
@@ -63,8 +23,12 @@
     friends)
   )
 
-;(hops-away relations 'Andy 1)
-;(hops-away relations 'Kathy 2)
+
+; eliminate duplicates from a list 
+(define (dedupe e)
+  (if (null? e) '()
+      (cons (car e) (dedupe (filter (lambda (x) (not (equal? x (car e)))) 
+                                    (cdr e))))))
 
 
 ; Get the weights from a person to every other person, return as a list of lists ( (person1 weight1) (person2 weight2) ...)
@@ -77,11 +41,11 @@
     weights)
   )
 
-; (getWeightsFrom 'Andy)
 
-; sorting function for the weighted paths
+; sorting function for the weighted social network paths
 (define (weightSort x y)
    (< (cadr x) (cadr y)))
+
 
 ; Get the relationship weights for all persons N hops from a person 
 (define (getWeightsFromHopSet person hops)
@@ -93,57 +57,88 @@
     (sort weights weightSort)  ; return the list of weighted paths in ascending sorted order 
   ))
 
-; (getWeightsFromHopSet 'Andy 2)
+
+; return a list of the products bought by a person 
+(define (%boughtProducts person)
+  (dedupe (cdar 
+           (%which (products)
+                   (%let (product)
+                         (%bag-of product (%bought person product) products))))))
 
 
-(define (addSocial! person1 person2 weight)
-  (add-edge! relations person1 person2 weight))
-
-(addSocial! 'Betty 'Lou 5)
-
-(define (addPurchase! person product)
-  (%assert! %bought () [(person product)]))
-
-(addPurchase! 'Betty 'iPhone)
-
-(define (addProduct! product category)
-  (%assert! %products () [(product category)]))
-
-(addProduct! 'Blackberry 'Electronics)
-
-
-(define (%bought-products person)
+; the products bought by the friend but not the person 
+(define (%notBoughtProducts person friend)
   (%which (products)
           (%let (product)
-                (%bag-of product (%bought person product) products))))
+                (%bag-of product (%and (%bought friend product)
+                                       (%not (%bought person product)))
+                         products))))
 
-(define (%bought-categories person)
-  (%which (categories)
-          (%let (p category)
-                (%bag-of category (%and (%products p category) (%bought person p)) categories))))
 
-(define (%products-in-category category)
+; the categories purchased by a person
+(define (%boughtCategories person)
+  (dedupe (cdar 
+           (%which (categories)
+                   (%let (p category)
+                         (%bag-of category (%and (%products p category) (%bought person p)) categories))))))
+
+
+; products in a category 
+(define (%productsInCategory category)
   (%which (products)
           (%let (product)
                 (%bag-of product (%products product category) products))))
 
-;(%products-in-category 'Electronics)
 
 
+;************************************************************************************************************************************
+; public functions 
+
+; add a relationship to the social graph of a certain weight 
+(define (addSocial! person1 person2 weight)
+  (add-edge! relations person1 person2 weight))
+
+
+; declare that a person bought a product 
+(define (addPurchase! person product)
+  (%assert! %bought () [(person product)]))
+
+
+; declare that the product is a member of a category 
+(define (addProduct! product category)
+  (%assert! %products () [(product category)]))
+
+ 
 (define (recommendProduct person hops)
   (begin
+    ; get the friends of a person within a certain number of social hops, sorted by strength of connection 
     (define weightedFriends (getWeightsFromHopSet person hops))
-    (define boughtProducts (cdar (%bought-products person)))
-    (define boughtCategories (cdar (%bought-categories person)))
+    ; get the products this person bought 
+    (define personBoughtProducts (%boughtProducts person))
+    ; get the categories this person bought 
+    (define personBoughtCategories (%boughtCategories person))
+    ; for each weighted friend in order, see if the friend bought a product from one of the categories of the person,
+    ; but not one the person bought
+    
+    
+    
+    ; debug 
     (display weightedFriends)
     (display "\n")
-    (display boughtProducts)
+    (display personBoughtProducts)
     (display "\n")
-    (display boughtCategories)
+    (display personBoughtCategories)
     (display "\n")
-    
+
+    (display (%notBoughtProducts person 'Andy))
+    (display "\n")
     )
   )
+
+
+
+;************************************************************************************************************************************
+; debug 
 
 
 ;(begin (display "--> ") (%which (category) (%bought-categories 'Andy)))
@@ -151,7 +146,70 @@
 ;(begin (display "--> ") (%which () (%bought-category 'Andy 'Electronics)))
 ;(begin (display "--> ") (%which () (%bought-category 'Andy 'Crafts)))
 
-(recommendProduct 'Andy 2)
+;(%products-in-category 'Electronics)
+
+;(hops-away relations 'Andy 1)
+;(hops-away relations 'Kathy 2)
+
+; (getWeightsFrom 'Andy)
+
+; (getWeightsFromHopSet 'Andy 2)
+
+
+
+;************************************************************************************************************************************
+; test 
+
+; add some weighted edges
+
+(addSocial! 'Andy 'Kathy 1)
+(addSocial! 'Kathy 'Sal 1)
+(addSocial! 'Andy 'Sal 1)
+(addSocial! 'Andy 'Dom 1)
+(addSocial! 'Andy 'Sal 1)
+(addSocial! 'Andy 'Tony 5)
+(addSocial! 'Sal 'Hannah 3)
+(addSocial! 'Dom 'Hannah 5)
+(addSocial! 'Sal 'Tony 10)
+(addSocial! 'Dom 'Tony 10)
+(addSocial! 'Tony 'Hannah 5)
+(addSocial! 'Hannah 'Susan 5)
+(addSocial! 'Susan 'Wendy 5)
+(addSocial! 'Wendy 'Betty 5)
+(addSocial! 'Betty 'Kathy 5)
+(addSocial! 'Betty 'Lou 5)
+
+(addPurchase! 'Andy 'MacBook)
+(addPurchase! 'Kathy 'Kindle)
+(addPurchase! 'Sal 'Android)
+(addPurchase! 'Dom 'iPhone)
+(addPurchase! 'Kathy 'Yarn)
+(addPurchase! 'Dom 'Paint)
+(addPurchase! 'Sal 'Sneakers)
+(addPurchase! 'Tony 'Football)
+(addPurchase! 'Tony 'iPhone)
+(addPurchase! 'Hannah 'iPhone)
+(addPurchase! 'Hannah 'Paint)
+(addPurchase! 'Susan 'Yarn)
+(addPurchase! 'Wendy 'YogaMat)
+(addPurchase! 'Betty 'YogaMat)
+(addPurchase! 'Betty 'iPhone)
+(addPurchase! 'Kathy 'MacBook)
+(addPurchase! 'Andy 'Android)
+
+(addProduct! 'MacBook 'Electronics)
+(addProduct! 'Kindle 'Electronics)
+(addProduct! 'Android 'Electronics)
+(addProduct! 'iPhone 'Electronics)
+(addProduct! 'Yarn 'Crafts)
+(addProduct! 'Paint 'Crafts)
+(addProduct! 'Football 'Sporting)
+(addProduct! 'YogaMat 'Sporting)
+(addProduct! 'Sneakers 'Sporting)
+(addProduct! 'Blackberry 'Electronics)
+
+
+(recommendProduct 'Kathy 2)
 
 
 
