@@ -22,7 +22,7 @@
 
 
 ; Return the list of persons no more than maxhops hops away. Do a breadth first search to count hops from a source node. 
-(define (hops-away graph start maxhops)
+(define (hopsAway graph start maxhops)
   (begin
     (define friends '())
     (let-values ( [ (first second) (bfs graph start) ] )
@@ -39,7 +39,7 @@
 ; Get the relationship weights for all persons N hops from a person 
 (define (getWeightsFromHopSet person hops)
   (begin
-    (define set (hops-away relations person hops))
+    (define set (hopsAway relations person hops))
     (define weights '())
     (let-values ( [ (first second) (dijkstra relations person) ] )
       (hash-for-each first (lambda (k v) (when (and (not (equal? v 0)) (member k set)) (set! weights (cons (list k v) weights))))))    
