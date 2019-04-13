@@ -70,6 +70,7 @@
     ))
 
 
+; walk the list of ordered friends, returning the first valid product recommendation, else return #f 
 (define (consultFriends person friends)
   (cond ((null? friends) #f)
         ((%notBoughtProductsInSimilarCategories person (caar friends))
@@ -102,11 +103,11 @@
     (define weightedFriends (getWeightsFromHopSet person hops))
     ; for each weighted friend in order, see if the friend bought a product from one of the categories of the person,
     ; but not one the person bought
-    (display person) (display ": ")
+    (display "DEBUG: ") (display person) (display ": ")
     (let ((result (consultFriends person weightedFriends)))
       (if (not (eq? result #f))
-          (begin (display "DEBUG: ") (display (car result)) (display " recommends ") (display (cadr result)) (display "\n")
-                                       (cadr result)) #f)
+          (begin (display (car result)) (display " recommends ") (display (cadr result)) (display "\n")
+                 (cadr result)) #f)
       )))
 
 
