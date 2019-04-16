@@ -14,7 +14,8 @@
 ; private functions 
 
 
-; eliminate duplicates from a list 
+; eliminate duplicates from a list - I've since realized this is unnecessary since I could have used set-of instead of bag-of
+; and avoided duplicates
 (define (dedupe e)
   (if (null? e) '()
       (cons (car e) (dedupe (filter (lambda (x) (not (equal? x (car e)))) 
